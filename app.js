@@ -6,7 +6,7 @@ const STORAGE = 'ponchi-maker.document.v1';
 const font = '"Segoe UI", "Noto Sans JP", Meiryo, sans-serif';
 const svg = $('artboard'), shapes = $('shapes'), overlay = $('selection-overlay');
 let doc = sampleDocument(), selection = new Set(), undoStack = [], redoStack = [], gesture = null;
-let scale = 1, gridVisible = true, toastTimer, editingId = null, dragId = null, storageOK = true, shapeSignature = '';
+let scale = 1, gridVisible = true, toastTimer, editingId = null, dragId = null, storageOK = true, shapeSignature = '', lastTap = null;
 const measure = document.createElement('canvas').getContext('2d');
 try { const saved = localStorage.getItem(STORAGE); if (saved) doc = parseDocument(JSON.parse(saved)); }
 catch { storageOK = false; }
@@ -158,7 +158,7 @@ function duplicate() {
     doc.elements.push(...clones); selection = new Set(clones.map(e => e.id)); });
 }
 function removeSelected() { if (selection.size) change(() => { doc.elements = doc.elements.filter(e => !selection.has(e.id)); selection.clear(); }); }
-function openTextEditor(id) { const e = doc.elements.find(e => e.id === id); if (!e) return; editingId = id; $('edit-text').value = e.text; $('text-dialog').showModal(); $('edit-text').focus(); }
+function openTextEditor(id) { const e = doc.elements.find(e => e.id === id); if (!e || $('text-dialog').open) return; editingId = id; $('edit-text').value = e.text; $('text-dialog').showModal(); $('edit-text').focus(); }
 $('text-dialog').addEventListener('close', () => { if ($('text-dialog').returnValue === 'apply') change(() => { const e = doc.elements.find(e => e.id === editingId); if (e) { e.text = $('edit-text').value; fitTextElement(e); } }); editingId = null; });
 function fitTextElement(e) {
   if (e.type !== 'text') return;
@@ -177,7 +177,7 @@ svg.addEventListener('pointerdown', event => {
     if (shape) {
       const id = shape.dataset.id, multi = event.shiftKey || event.ctrlKey || event.metaKey;
       if (multi) selectItem(id, true); else if (!selection.has(id)) selection = new Set([id]);
-      gesture = { kind: 'move', start: p, before: copy(doc), originals: copy(selected()) };
+      gesture = { kind: 'move', start: p, before: copy(doc), originals: copy(selected()), tapId: multi ? null : id };
     } else {
       if (!event.shiftKey) selection.clear(); gesture = { kind: 'marquee', start: p, base: new Set(selection), before: copy(doc) };
     }
@@ -202,12 +202,26 @@ function endGesture(event, cancel = false) {
   if (!gesture) return; const old = gesture; gesture = null;
   if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
   $('marquee').setAttribute('display', 'none');
-  if (cancel) { doc = old.before; render(); } else commit(old.before);
+  if (cancel) { doc = old.before; render(); lastTap = null; }
+  else {
+    commit(old.before);
+    const p = point(event);
+    if (old.tapId && Math.hypot(p.x - old.start.x, p.y - old.start.y) * scale < 4) {
+      if (lastTap && lastTap.id === old.tapId && event.timeStamp - lastTap.time < 400) { lastTap = null; openTextEditor(old.tapId); }
+      else lastTap = { id: old.tapId, time: event.timeStamp };
+    } else lastTap = null;
+  }
 }
 svg.addEventListener('pointerup', event => endGesture(event));
 svg.addEventListener('pointercancel', event => endGesture(event, true));
 svg.addEventListener('lostpointercapture', event => { if (gesture) endGesture(event, true); });
-svg.addEventListener('dblclick', event => { const shape = event.target.closest('[data-id]'); if (shape) openTextEditor(shape.dataset.id); });
+svg.addEventListener('dblclick', event => {
+  const shape = event.target.closest('[data-id]');
+  if (shape) return openTextEditor(shape.dataset.id);
+  const p = point(event);
+  const hit = [...doc.elements].reverse().find(e => p.x >= e.x && p.x <= e.x + e.width && p.y >= e.y && p.y <= e.y + e.height);
+  if (hit) openTextEditor(hit.id);
+});
 
 for (const key of ['name', 'x', 'y', 'width', 'height', 'text', 'fontSize', 'color', 'fill', 'stroke', 'strokeWidth', 'radius']) {
   $(`prop-${key}`).addEventListener('change', event => {
