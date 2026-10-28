@@ -1,0 +1,8 @@
+{
+  "name": "ponchi-maker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node serve.mjs", "test": "node --test model.test.mjs" },
+  "description": "ブラウザで使えるGUIポンチ絵エディター"
+}
