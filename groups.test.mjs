@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blankDocument, element, groupSelection, ungroupSelection, parseDocument, copy, childrenOf, selectionRoots, selectionLeaves, paintOrder, moveSelection, resizeNode, alignSelection, groupLayout, detectLayout, dropNode, reorderSelection, pruneEmptyGroups } from './model.js';
+import { blankDocument, element, groupSelection, ungroupSelection, parseDocument, copy, childrenOf, selectionRoots, selectionLeaves, paintOrder, moveSelection, duplicateSelection, resizeNode, alignSelection, groupLayout, detectLayout, dropNode, reorderSelection, pruneEmptyGroups } from './model.js';
 
 function fixture() { const doc = blankDocument(); doc.elements = [element('rect', { id: 'a', x: 50, y: 50, width: 100, height: 60 }), element('text', { id: 'b', x: 180, y: 50, width: 80, height: 60 }), element('rect', { id: 'c', x: 400, y: 200, width: 80, height: 80 })]; return doc; }
 test('v1 JSON migrates without discarding contents', () => { const doc = fixture(); doc.version = 1; const imported = parseDocument(doc); assert.equal(imported.version, 2); assert.deepEqual(imported.elements, doc.elements); });
@@ -57,3 +57,13 @@ test('JSON rejects cycles, orphan parents and empty groups', () => {
   for (const mutate of [d => d.elements.find(e => e.id === g.id).parentId = g.id, d => d.elements[0].parentId = 'missing', d => d.elements[0].parentId = 'c', d => { d.elements = d.elements.filter(e => e.parentId !== g.id); }]) { const invalid = copy(doc); mutate(invalid); assert.throws(() => parseDocument(invalid)); }
 });
 test('deleting the last children prunes nested empty groups', () => { const doc = fixture(), g = groupSelection(doc, ['a', 'b']), outer = groupSelection(doc, [g.id, 'c']); doc.elements = doc.elements.filter(e => e.type === 'group'); pruneEmptyGroups(doc); assert.deepEqual(doc.elements, []); assert.ok(outer); });
+test('duplicating nested groups preserves sibling stacking and remaps every parent', () => {
+  const doc = fixture(); for (const e of doc.elements) e.name = e.id;
+  const g = groupSelection(doc, ['a', 'b']), outer = groupSelection(doc, [g.id, 'c']);
+  const originalOrder = paintOrder(doc).map(e => e.name), originalIds = new Set(doc.elements.map(e => e.id));
+  const [clone] = duplicateSelection(doc, [outer.id, 'a']);
+  assert.deepEqual(paintOrder(doc).slice(-3).map(e => e.name), originalOrder);
+  assert.ok(!originalIds.has(clone));
+  for (const e of selectionLeaves(doc, [clone])) { assert.ok(!originalIds.has(e.id)); assert.ok(!originalIds.has(e.parentId)); }
+  assert.doesNotThrow(() => parseDocument(doc));
+});

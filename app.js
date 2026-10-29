@@ -1,5 +1,5 @@
-import { copy, uid, element, blankDocument, sampleDocument, bounds, clamp, moveItems, resized, parseDocument, childrenOf, descendants, selectionRoots, selectionLeaves, paintOrder, refreshGroups, rootForCanvas, groupSelection, ungroupSelection, pruneEmptyGroups, dropNode, reorderSelection, resizeNode, moveSelection, alignSelection, groupLayout } from './model.js?v=2.0.0';
-import { importQtUi, exportQtUi } from './qt-ui.js?v=2.0.0';
+import { copy, element, blankDocument, sampleDocument, bounds, clamp, moveItems, resized, parseDocument, childrenOf, descendants, selectionRoots, selectionLeaves, paintOrder, refreshGroups, rootForCanvas, groupSelection, ungroupSelection, pruneEmptyGroups, dropNode, reorderSelection, resizeNode, moveSelection, duplicateSelection, alignSelection, groupLayout } from './model.js?v=2.0.1';
+import { importQtUi, exportQtUi } from './qt-ui.js?v=2.0.1';
 
 const $ = id => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -22,6 +22,7 @@ const node = (tag, attrs = {}, text) => {
 const selected = () => selectionRoots(doc, selection);
 const label = e => e.name || e.text.replace(/\n/g, ' ').trim() || (e.type === 'group' ? 'グループ' : e.type === 'rect' ? '四角' : '文字');
 const round = n => Math.round(n * 100) / 100;
+function trackDrag(phase) { if (location.search.includes('sandbox=1')) $('outliner').dataset.dragTrace = (($('outliner').dataset.dragTrace || '') + '|' + phase).slice(-600); }
 function toast(message) { $('toast').textContent = message; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 4200); }
 function persist() {
   try { localStorage.setItem(STORAGE, JSON.stringify(doc)); storageOK = true; $('save-state').textContent = 'このブラウザに自動保存済み'; }
@@ -107,18 +108,18 @@ function renderOutliner() {
     row.addEventListener('click', event => { selectItem(e.id, event.shiftKey || event.ctrlKey || event.metaKey); render(); });
     row.addEventListener('dblclick', () => openTextEditor(e.id));
     row.addEventListener('keydown', event => { if (event.target !== row) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectItem(e.id, event.shiftKey); render(); } if (e.type === 'group' && ['ArrowLeft', 'ArrowRight'].includes(event.key)) { event.stopPropagation(); event.preventDefault(); if (event.key === 'ArrowLeft') collapsedGroups.add(e.id); else collapsedGroups.delete(e.id); renderOutliner(); } });
-    row.addEventListener('dragstart', event => { dragId = e.id; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', e.id); });
+    row.addEventListener('dragstart', event => { dragId = e.id; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', e.id); trackDrag('start:' + label(e)); });
     const dropPosition = event => { const r = row.getBoundingClientRect(), fraction = (event.clientY - r.top) / r.height; return e.type === 'group' && fraction > .25 && fraction < .75 ? 'inside' : fraction < .5 ? 'before' : 'after'; };
-    row.addEventListener('dragover', event => { event.preventDefault(); const where = dropPosition(event); row.classList.toggle('drop-before', where === 'before'); row.classList.toggle('drop-after', where === 'after'); row.classList.toggle('drop-inside', where === 'inside'); });
+    row.addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const where = dropPosition(event); trackDrag('over:' + label(e) + ':' + where); row.classList.toggle('drop-before', where === 'before'); row.classList.toggle('drop-after', where === 'after'); row.classList.toggle('drop-inside', where === 'inside'); });
     row.addEventListener('dragleave', () => row.classList.remove('drop-before', 'drop-after', 'drop-inside'));
     row.addEventListener('drop', event => {
-      event.preventDefault(); const where = dropPosition(event);
+      event.preventDefault(); const where = dropPosition(event); trackDrag('drop:' + label(e) + ':' + (dragId || 'none'));
       if (dragId && dragId !== e.id && doc.elements.some(item => item.id === dragId)) change(() => {
         if (dropNode(doc, dragId, e.id, where)) { selection = new Set([dragId]); if (where === 'inside') collapsedGroups.delete(e.id); }
       }); else renderOutliner();
       dragId = null;
     });
-    row.addEventListener('dragend', () => { dragId = null; renderOutliner(); }); container.append(row);
+    row.addEventListener('dragend', () => { trackDrag('end'); dragId = null; renderOutliner(); }); container.append(row);
     if (e.type === 'group' && !collapsedGroups.has(e.id)) rows(e.id, depth + 1);
    }
   }
@@ -172,11 +173,7 @@ function addElement(type) {
 }
 function duplicate() {
   const items = selected(); if (!items.length) return;
-  const originals = [...new Map(items.flatMap(e => [e, ...(e.type === 'group' ? descendants(doc, e.id) : [])]).map(e => [e.id, e])).values()];
-  if (doc.elements.length + originals.length > 1000) return toast('グループを含め1000要素までです。');
-  change(() => { const clones = copy(originals), ids = new Map(originals.map(e => [e.id, uid()]));
-    for (const e of clones) { const oldId = e.id; e.id = ids.get(oldId); if (ids.has(e.parentId)) e.parentId = ids.get(e.parentId); if (items.some(item => item.id === oldId) && e.name) e.name = `${e.name.slice(0, 95)} コピー`; }
-    doc.elements.push(...clones); selection = new Set(items.map(e => ids.get(e.id))); moveSelection(doc, selection, 20, 20); });
+  change(() => { selection = new Set(duplicateSelection(doc, selection)); });
 }
 function removeSelected() { if (selection.size) change(() => { const removed = new Set(selected().flatMap(e => [e.id, ...(e.type === 'group' ? descendants(doc, e.id).map(child => child.id) : [])])); doc.elements = doc.elements.filter(e => !removed.has(e.id)); pruneEmptyGroups(doc); selection.clear(); }); }
 function makeGroup() { change(() => { const group = groupSelection(doc, selection); selection = new Set([group.id]); collapsedGroups.delete(group.id); }); }
@@ -282,7 +279,7 @@ $('undo').addEventListener('click', () => history()); $('redo').addEventListener
 $('duplicate').addEventListener('click', duplicate); $('delete').addEventListener('click', removeSelected);
 $('group-current').addEventListener('click', makeGroup); $('ungroup-current').addEventListener('click', breakGroup);
 $('group-layout').addEventListener('change', event => change(() => { if (selected()[0]?.type === 'group') selected()[0].layout = event.target.value; }));
-$('root-drop-zone').addEventListener('dragover', event => { event.preventDefault(); $('root-drop-zone').classList.add('drop-inside'); });
+$('root-drop-zone').addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; $('root-drop-zone').classList.add('drop-inside'); });
 $('root-drop-zone').addEventListener('dragleave', () => $('root-drop-zone').classList.remove('drop-inside'));
 $('root-drop-zone').addEventListener('drop', event => { event.preventDefault(); $('root-drop-zone').classList.remove('drop-inside'); if (dragId) change(() => { dropNode(doc, dragId, null); selection = new Set([dragId]); }); dragId = null; });
 document.querySelectorAll('[data-align]').forEach(button => button.addEventListener('click', () => change(() => {

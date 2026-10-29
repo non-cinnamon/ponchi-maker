@@ -250,6 +250,18 @@ export function resizeNode(doc, id, box) {
   refreshGroups(doc);
 }
 export function moveSelection(doc, ids, dx, dy) { moveItems(selectionLeaves(doc, ids), dx, dy, doc.canvas); refreshGroups(doc); }
+export function duplicateSelection(doc, ids) {
+  const roots = selectionRoots(doc, ids), included = new Set(roots.flatMap(e => [e.id, ...(e.type === 'group' ? descendants(doc, e.id).map(child => child.id) : [])]));
+  const originals = doc.elements.filter(e => included.has(e.id));
+  if (doc.elements.length + originals.length > 1000) throw new Error('グループを含め1000要素までです。');
+  const mapping = new Map(originals.map(e => [e.id, uid()])), clones = copy(originals);
+  for (const e of clones) {
+    const oldId = e.id; e.id = mapping.get(oldId);
+    if (mapping.has(e.parentId)) e.parentId = mapping.get(e.parentId);
+    if (roots.some(root => root.id === oldId) && e.name) e.name = `${e.name.slice(0, 95)} コピー`;
+  }
+  doc.elements.push(...clones); const result = roots.map(e => mapping.get(e.id)); moveSelection(doc, result, 20, 20); return result;
+}
 export function alignSelection(doc, ids, action) {
   const items = selectionRoots(doc, ids), before = items.map(e => ({ id: e.id, x: e.x, y: e.y }));
   if (!alignItems(items, action)) return false;

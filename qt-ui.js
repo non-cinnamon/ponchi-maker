@@ -1,4 +1,4 @@
-import { element, blankDocument, parseDocument, childrenOf, groupLayout, refreshGroups, clamp, QT_CLASSES } from './model.js?v=2.0.0';
+import { element, blankDocument, parseDocument, childrenOf, groupLayout, refreshGroups, clamp, QT_CLASSES } from './model.js?v=2.0.1';
 
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]);
 const int = value => Math.round(value);
