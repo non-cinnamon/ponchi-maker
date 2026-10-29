@@ -1,8 +1,14 @@
 {
   "name": "ponchi-maker",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node serve.mjs", "test": "node --test model.test.mjs" },
-  "description": "ブラウザで使えるGUIポンチ絵エディター"
+  "scripts": {
+    "start": "node serve.mjs",
+    "test": "node --test *.test.mjs"
+  },
+  "description": "ブラウザで使えるGUIポンチ絵エディター",
+  "devDependencies": {
+    "@xmldom/xmldom": "0.9.12"
+  }
 }

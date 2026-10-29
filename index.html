@@ -7,15 +7,19 @@
   <meta name="description" content="GUIのアイデアを、四角と文字でさっと形に。ブラウザで使えるポンチ絵エディター。">
   <title>ponchi maker — ポンチ絵メーカー</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css">
-  <script type="module" src="./app.js?v=1.0.1"></script>
+  <link rel="stylesheet" href="./style.css?v=2.0.0">
+  <link rel="stylesheet" href="./groups.css?v=2.0.0">
+  <script type="module" src="./app.js?v=2.0.0"></script>
 </head>
 <body>
   <header class="app-header">
     <a class="brand" href="./" aria-label="ponchi maker ホーム"><span class="brand-mark" aria-hidden="true">▧</span><span>ponchi<span class="brand-light"> maker</span></span><span class="beta">BETA</span></a>
     <div class="project"><input id="document-name" aria-label="ドキュメント名" maxlength="80" value="はじめてのポンチ絵"><span id="save-state" role="status">このブラウザに自動保存</span></div>
     <nav class="file-actions" aria-label="ファイル操作">
-      <button id="new-document" class="quiet">新規</button><button id="import-json" class="quiet">開く</button><button id="export-json" class="secondary">JSON保存</button><button id="export-png" class="primary">↗ PNG書き出し</button>
+      <button id="new-document" class="quiet">新規</button>
+      <div class="format-actions" role="group" aria-label="Qt .ui"><span>Qt</span><button id="import-qt" class="quiet" aria-label="Qt Import">Import</button><button id="export-qt" class="secondary" aria-label="Qt Export">Export</button></div>
+      <div class="format-actions" role="group" aria-label="JSON"><span>JSON</span><button id="import-json" class="quiet" aria-label="JSON Import">Import</button><button id="export-json" class="secondary" aria-label="JSON Export">Export</button></div>
+      <button id="export-png" class="primary">↗ PNG書き出し</button>
     </nav>
   </header>
   <main class="editor">
@@ -28,7 +32,7 @@
     </aside>
     <section class="workspace" aria-label="レイアウト編集">
       <div class="workspace-toolbar">
-        <div class="history-actions"><button id="undo" class="icon-button" title="元に戻す (Ctrl+Z)" aria-label="元に戻す">↶</button><button id="redo" class="icon-button" title="やり直す (Ctrl+Shift+Z)" aria-label="やり直す">↷</button><span class="toolbar-divider"></span><button id="duplicate" class="quiet" title="複製 (Ctrl+D)">複製</button><button id="delete" class="quiet" title="削除 (Delete)">削除</button></div>
+        <div class="history-actions"><button id="undo" class="icon-button" title="元に戻す (Ctrl+Z)" aria-label="元に戻す">↶</button><button id="redo" class="icon-button" title="やり直す (Ctrl+Shift+Z)" aria-label="やり直す">↷</button><span class="toolbar-divider"></span><button id="duplicate" class="quiet" title="複製 (Ctrl+D)">複製</button><button id="delete" class="quiet" title="削除 (Delete)">削除</button><span class="toolbar-divider"></span><button id="group-current" class="quiet" title="グループ化 (Ctrl+G)">グループ化</button><button id="ungroup-current" class="quiet" title="グループ解除 (Ctrl+Shift+G)">解除</button></div>
         <div class="zoom-actions"><label for="zoom">表示</label><select id="zoom" aria-label="表示倍率"><option value="fit">全体表示</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select><button id="grid-toggle" class="icon-button" title="グリッドを表示" aria-label="グリッドを表示" aria-pressed="true">▦</button></div>
       </div>
       <div id="viewport" class="viewport">
@@ -37,17 +41,18 @@
       <footer class="workspace-footer"><span id="selection-status">クリックで選択</span><span class="footer-hint">Shiftで複数選択 · ダブルクリックで文字編集</span><span id="element-count">0 要素</span></footer>
     </section>
     <aside class="inspector" aria-label="要素一覧と設定">
-      <section class="outliner-section"><div class="section-heading"><h2>要素一覧</h2><span id="outline-count" class="count-badge">0</span></div><p class="section-note">上ほど手前 · ドラッグで並べ替え</p><div id="outliner" class="outliner" role="list" aria-label="要素一覧"></div><div class="layer-actions"><button data-order="front" title="最前面へ" aria-label="最前面へ">⇈</button><button data-order="forward" title="1つ前へ" aria-label="1つ前へ">↑</button><button data-order="backward" title="1つ後ろへ" aria-label="1つ後ろへ">↓</button><button data-order="back" title="最背面へ" aria-label="最背面へ">⇊</button></div></section>
+      <section class="outliner-section"><div class="section-heading"><h2>要素一覧</h2><span id="outline-count" class="count-badge">0</span></div><p class="section-note">上ほど手前 · グループ中央へドロップで格納</p><div id="outliner" class="outliner" role="tree" aria-label="要素一覧" aria-multiselectable="true"></div><div id="root-drop-zone" class="root-drop-zone">ここにドロップで最上位へ</div><div class="layer-actions"><button data-order="front" title="最前面へ" aria-label="最前面へ">⇈</button><button data-order="forward" title="1つ前へ" aria-label="1つ前へ">↑</button><button data-order="backward" title="1つ後ろへ" aria-label="1つ後ろへ">↓</button><button data-order="back" title="最背面へ" aria-label="最背面へ">⇊</button></div></section>
       <section class="properties-section"><div class="section-heading"><h2>プロパティ</h2><span id="type-badge" class="type-badge">作業領域</span></div>
         <div id="empty-properties"><p class="empty-note">要素を選択すると、<br>位置や見た目を編集できます。</p><div class="field-pair"><label>幅<input id="canvas-width" type="number" min="320" max="4096" step="10" value="1200"></label><label>高さ<input id="canvas-height" type="number" min="240" max="4096" step="10" value="800"></label></div></div>
         <div id="element-properties" hidden>
           <label class="field">管理用の名前<input id="prop-name" maxlength="100" placeholder="名前をつける"></label>
           <div class="field-pair"><label>X<input id="prop-x" type="number" step="1" min="0"></label><label>Y<input id="prop-y" type="number" step="1" min="0"></label></div>
           <div class="field-pair"><label>幅<input id="prop-width" type="number" step="1" min="24"></label><label>高さ<input id="prop-height" type="number" step="1" min="24"></label></div>
-          <label class="field">表示する文字<textarea id="prop-text" rows="3" maxlength="2000" placeholder="文字を入力"></textarea></label>
+          <div id="text-properties"><label class="field">表示する文字<textarea id="prop-text" rows="3" maxlength="2000" placeholder="文字を入力"></textarea></label>
           <div class="field-pair"><label>文字サイズ<input id="prop-fontSize" type="number" min="8" max="120"></label><label>文字色<input id="prop-color" type="color"></label></div>
           <div id="rect-properties"><div class="field-pair"><label>背景色<input id="prop-fill" type="color"></label><label>枠線色<input id="prop-stroke" type="color"></label></div><div class="field-pair"><label>枠線の太さ<input id="prop-strokeWidth" type="number" min="0" max="12"></label><label>角の丸み<input id="prop-radius" type="number" min="0" max="80"></label></div></div>
-          <p id="overflow-note" class="warning" hidden>文字が枠からはみ出しています。枠を広げるか文字サイズを調整してください。</p>
+          <p id="overflow-note" class="warning" hidden>文字が枠からはみ出しています。枠を広げるか文字サイズを調整してください。</p></div>
+          <div id="group-properties" hidden><label class="field">Qt出力時の配置<select id="group-layout"><option value="auto">自動判定</option><option value="H">H · 横方向</option><option value="V">V · 縦方向</option><option value="free">自由配置</option></select></label><p id="group-layout-result" class="section-note"></p><p class="section-note">入れ子・折りたたみができます。個別編集は一覧から選択、またはAlt＋クリック。</p></div>
         </div>
         <div id="multi-properties" hidden><p class="empty-note">複数の要素を選択しています。<br>まとめて移動・整列できます。</p></div>
       </section>
@@ -55,8 +60,11 @@
     </aside>
   </main>
   <input type="file" id="file-input" accept=".json,application/json" hidden>
+  <input type="file" id="qt-file-input" accept=".ui,application/xml,text/xml" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="text-dialog"><form method="dialog"><div class="dialog-heading"><h2>文字を編集</h2><button value="cancel" class="icon-button" aria-label="閉じる">×</button></div><textarea id="edit-text" rows="5" maxlength="2000" aria-label="要素の文字"></textarea><p class="section-note">改行できます。四角内では常に中央に表示されます。</p><div class="dialog-actions"><button value="cancel" class="secondary">キャンセル</button><button id="apply-text" value="apply" class="primary">適用</button></div></form></dialog>
-  <dialog id="help-dialog"><div class="dialog-heading"><h2>アイデアを、四角と文字で。</h2><button id="close-help" class="icon-button" aria-label="使い方を閉じる">×</button></div><p>左の「四角」「文字」から追加。配置したらPNGで書き出して、ChatGPTに見せられます。</p><dl class="help-list"><dt>移動・サイズ変更</dt><dd>ドラッグで移動。選択枠の四隅・辺でサイズ変更。文字の大きさは変わりません。</dd><dt>隠れた要素の編集</dt><dd>右の要素一覧から選択し、紫の選択枠の線をドラッグして移動。位置や大きさの数値入力でも編集できます。</dd><dt>複数選択・整列</dt><dd>Shift＋クリック、または余白から範囲選択。整列は選択した全要素の外枠が基準です。</dd><dt>重なり順</dt><dd>要素一覧は上ほど手前。行の並べ替え、または矢印ボタンで変更できます。</dd><dt>キーボード</dt><dd>R：四角 / T：文字 / Delete：削除 / 矢印：1px移動（Shiftで10px） / Ctrl・⌘＋D：複製 / Ctrl・⌘＋Z：元に戻す / Ctrl・⌘＋Shift＋Z：やり直す / Ctrl・⌘＋A：全選択 / Esc：選択解除</dd><dt>保存について</dt><dd>編集内容はこのブラウザに自動保存。JSON保存でファイルとして残せます。共有や別端末への移動にもJSONを使ってください。サーバーへ編集内容を送信する機能はありません。</dd></dl></dialog>
+  <dialog id="help-dialog"><div class="dialog-heading"><h2>アイデアを、四角と文字で。</h2><button id="close-help" class="icon-button" aria-label="使い方を閉じる">×</button></div><p>左の「四角」「文字」から追加。配置したらPNGで書き出して、ChatGPTに見せられます。</p><dl class="help-list"><dt>移動・サイズ変更</dt><dd>ドラッグで移動。選択枠の四隅・辺でサイズ変更。文字の大きさは変わりません。</dd><dt>隠れた要素の編集</dt><dd>右の要素一覧から選択し、紫の選択枠の線をドラッグして移動。位置や大きさの数値入力でも編集できます。</dd><dt>グループ</dt><dd>同じ階層の要素を複数選択し「グループ化」（Ctrl・⌘＋G）。入れ子、まとめて移動・サイズ変更・複製ができます。「解除」はCtrl・⌘＋Shift＋G。一覧の三角で折りたたみ、グループ行の中央へドロップで格納、一覧下部へドロップで最上位へ移動できます。個別編集は一覧から選択、またはAlt＋クリック。</dd><dt>複数選択・整列</dt><dd>Shift＋クリック、または余白から範囲選択。整列は選択した全要素の外枠が基準です。</dd><dt>重なり順</dt><dd>要素一覧は上ほど手前。行の並べ替え、または矢印ボタンで同じ階層内の順番を変更できます。</dd><dt>Qt .ui</dt><dd>Qt Import / Exportから読込・書出。グループ内が横一列ならH、縦一列ならVに自動判定します。重なりや複数列は自由配置です。自動判定はプロパティから変更できます。四角・文字はQLabelに変換し、一般的なQtウィジェットも簡略読込できます。Qt側のサイズ調整で見た目が変わる場合があります。シグナル接続、画像、全ウィジェットの動作を再現するものではありません。</dd><dt>キーボード</dt><dd>R：四角 / T：文字 / Delete：削除 / 矢印：1px移動（Shiftで10px） / Ctrl・⌘＋D：複製 / Ctrl・⌘＋Z：元に戻す / Ctrl・⌘＋Shift＋Z：やり直す / Ctrl・⌘＋A：全選択 / Esc：選択解除</dd><dt>保存について</dt><dd>編集内容はこのブラウザに自動保存。JSONはグループ情報を含め完全に再編集するための形式です。旧JSONも読み込めます。共有や別端末への移動にもJSONを使ってください。サーバーへ編集内容を送信する機能はありません。</dd></dl></dialog>
+  <dialog id="import-dialog"><form method="dialog"><div class="dialog-heading"><h2>レイアウトを読み込む</h2><button value="cancel" class="icon-button" aria-label="読込をキャンセル">×</button></div><p id="import-summary"></p><ul id="import-warnings" class="notice-list"></ul><div class="dialog-actions"><button value="cancel" class="secondary">キャンセル</button><button value="apply" class="primary">読み込む</button></div></form></dialog>
+  <dialog id="notice-dialog"><div class="dialog-heading"><h2 id="notice-title"></h2><button id="close-notice" class="icon-button" aria-label="通知を閉じる">×</button></div><ul id="notice-list" class="notice-list"></ul></dialog>
 </body>
 </html>
